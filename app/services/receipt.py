@@ -3,6 +3,7 @@ import io
 import logging
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from app.config import settings
@@ -10,6 +11,30 @@ from app.models.billing import Billing
 from app.services.s3 import upload_receipt_to_s3
 
 logger = logging.getLogger(__name__)
+
+# Base directory for resolving relative /static/ paths
+_BASE_DIR = Path(__file__).resolve().parent.parent.parent  # backend/
+
+
+def _load_image(url_or_path: str):
+    """Load an image from a local /static/ path or a remote URL.
+    Returns an ImageReader or None on failure."""
+    from reportlab.lib.utils import ImageReader
+    try:
+        if url_or_path.startswith("/static/"):
+            local_path = _BASE_DIR / url_or_path.lstrip("/")
+            if local_path.is_file():
+                return ImageReader(str(local_path))
+            logger.warning("Static file not found: %s", local_path)
+            return None
+        else:
+            import urllib.request
+            with urllib.request.urlopen(url_or_path, timeout=5) as resp:
+                img_data = resp.read()
+            return ImageReader(io.BytesIO(img_data))
+    except Exception as e:
+        logger.warning("Failed to load image %s: %s", url_or_path, e)
+        return None
 
 # Receipt context (student/branch info for header)
 ReceiptContext = Optional[dict]  # student_name, class_name, branch_name
@@ -114,11 +139,9 @@ def _reportlab_pdf_bytes(billing: Billing, context: ReceiptContext = None) -> by
         header_top = y
         if logo_url:
             try:
-                import urllib.request
-                with urllib.request.urlopen(logo_url, timeout=5) as resp:
-                    img_data = resp.read()
-                from reportlab.lib.utils import ImageReader
-                img = ImageReader(io.BytesIO(img_data))
+                img = _load_image(logo_url)
+                if img is None:
+                    raise ValueError("Could not load school logo")
                 iw, ih = img.getSize()
                 max_h = 18 * mm
                 max_w = 60 * mm
@@ -327,12 +350,9 @@ def _reportlab_pdf_bytes(billing: Billing, context: ReceiptContext = None) -> by
         y_logo = margin_y + 6 * mm
         if trust_logo_url:
             try:
-                import urllib.request
-                from reportlab.lib.utils import ImageReader
-
-                with urllib.request.urlopen(trust_logo_url, timeout=5) as resp:
-                    t_img_data = resp.read()
-                    t_img = ImageReader(io.BytesIO(t_img_data))
+                t_img = _load_image(trust_logo_url)
+                if t_img is None:
+                    raise ValueError("Could not load trust logo")
                 tw, th = t_img.getSize()
                 max_h = 10 * mm
                 max_w = 55 * mm

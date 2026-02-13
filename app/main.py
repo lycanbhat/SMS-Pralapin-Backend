@@ -2,10 +2,13 @@
 import logging
 from contextlib import asynccontextmanager
 
+from pathlib import Path
+
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pymongo.errors import ServerSelectionTimeoutError
 
 from app.config import settings
@@ -74,6 +77,12 @@ app.include_router(staff.router, prefix="/api/staff", tags=["Staff Management"])
 app.include_router(holidays.router, prefix="/api/holidays", tags=["Holidays"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(gallery.router, prefix="/api/gallery", tags=["Gallery"])
+
+
+# Serve static files (logos, etc.)
+_static_dir = Path(__file__).resolve().parent.parent / "static"
+if _static_dir.is_dir():
+    app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 
 @app.get("/health")
