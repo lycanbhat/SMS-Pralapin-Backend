@@ -12,13 +12,13 @@ class StaffCreate(BaseModel):
     full_name: str
     email: EmailStr
     password: str
-    role: UserRole
+    role: str
     branch_id: Optional[str] = None
     assigned_class_ids: List[str] = []
 
 class StaffUpdate(BaseModel):
     full_name: Optional[str] = None
-    role: Optional[UserRole] = None
+    role: Optional[str] = None
     branch_id: Optional[str] = None
     assigned_class_ids: Optional[List[str]] = None
     is_active: Optional[bool] = None
@@ -32,7 +32,7 @@ async def list_staff(admin: AdminOnly):
         UserRole.FACULTY,
         UserRole.TEACHER,
     ]
-    staff = await User.find({"role": {"$in": staff_roles}}).to_list()
+    staff = await User.find({"role": {"$in": [r.value for r in staff_roles]}}).to_list()
     return [
         {
             "id": str(s.id),

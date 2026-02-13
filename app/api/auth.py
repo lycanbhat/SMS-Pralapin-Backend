@@ -3,7 +3,9 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
 from app.api.deps import get_password_hash, create_access_token, get_current_user, CurrentUser
-from app.models.user import User, UserRole, UserCreate
+from app.models.role import PermissionSet, Role
+from app.rbac import SYSTEM_MODULES
+from app.models.user import User, UserCreate
 from beanie import PydanticObjectId
 
 router = APIRouter()
@@ -36,7 +38,7 @@ async def login(req: LoginRequest):
     from app.api.deps import verify_password, create_refresh_token
     if not verify_password(req.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    access_token = create_access_token(str(user.id), user.role.value)
+    access_token = create_access_token(str(user.id), user.role)
     refresh_token = create_refresh_token(str(user.id))
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
@@ -58,7 +60,7 @@ async def register(data: UserCreate):
         assigned_class_ids=data.assigned_class_ids,
     )
     await user.insert()
-    access_token = create_access_token(str(user.id), user.role.value)
+    access_token = create_access_token(str(user.id), user.role)
     refresh_token = create_refresh_token(str(user.id))
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
@@ -82,21 +84,35 @@ async def refresh_token(req: RefreshRequest):
         raise HTTPException(status_code=401, detail="User not found or inactive")
 
     from app.api.deps import create_refresh_token
-    new_access = create_access_token(str(user.id), user.role.value)
+    new_access = create_access_token(str(user.id), user.role)
     new_refresh = create_refresh_token(str(user.id))
     return TokenResponse(access_token=new_access, refresh_token=new_refresh)
 
 
 @router.get("/me")
 async def me(user: CurrentUser):
+    role = await Role.find_one(Role.key == user.role)
+    module_keys = [m["key"] for m in SYSTEM_MODULES]
+    permissions: dict[str, dict[str, bool]] = {}
+    for module in module_keys:
+        current = role.permissions.get(module) if role else PermissionSet()
+        permissions[module] = {
+            "view": current.view,
+            "add": current.add,
+            "edit": current.edit,
+            "delete": current.delete,
+        }
+
     return {
         "id": str(user.id),
         "email": user.email,
-        "role": user.role.value,
+        "role": user.role,
         "full_name": user.full_name,
         "student_ids": user.student_ids,
         "branch_id": user.branch_id,
         "assigned_class_ids": user.assigned_class_ids,
+        "role_name": role.name if role else user.role.replace("_", " ").title(),
+        "permissions": permissions,
     }
 
 

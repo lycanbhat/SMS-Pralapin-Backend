@@ -16,6 +16,7 @@ from app.models import (
     Holiday,
     AcademicYear,
     Album,
+    Role,
 )
 
 
@@ -36,5 +37,6 @@ async def init_db():
             Holiday,
             AcademicYear,
             Album,
+            Role,
         ],
     )

@@ -1,14 +1,17 @@
-"""Shared dependencies: JWT auth, role checks."""
+"""Shared dependencies: JWT auth, role checks and permissions."""
 from datetime import datetime, timedelta
 from typing import Annotated, Optional
 
 import bcrypt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, OAuth2PasswordBearer
 from jose import JWTError, jwt
 
 from app.config import settings
+from app.models.role import Role
 from app.models.user import User, UserRole
+from app.rbac import ACTION_BY_METHOD, PermissionAction
+from app.services.roles import has_permission
 from beanie import PydanticObjectId
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
@@ -59,30 +62,53 @@ async def get_current_user(
 
 
 def require_roles(*allowed: UserRole):
+    allowed_values = [role.value for role in allowed]
+
     async def checker(user: Annotated[User, Depends(get_current_user)]):
-        if user.role not in allowed:
+        if user.role not in allowed_values:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
         return user
+
+    return checker
+
+
+async def get_current_role(user: Annotated[User, Depends(get_current_user)]) -> Role | None:
+    return await Role.find_one(Role.key == user.role)
+
+
+def require_permission(module: str, action: PermissionAction):
+    async def checker(
+        user: Annotated[User, Depends(get_current_user)],
+        role: Annotated[Role | None, Depends(get_current_role)],
+    ):
+        if not has_permission(role, module, action):
+            raise HTTPException(status_code=403, detail=f"Missing {module}.{action} permission")
+        return user
+
+    return checker
+
+
+def require_module_permission(module: str):
+    async def checker(
+        request: Request,
+        user: Annotated[User, Depends(get_current_user)],
+        role: Annotated[Role | None, Depends(get_current_role)],
+    ):
+        method = request.method.upper()
+        action = ACTION_BY_METHOD.get(method)
+        if not action:
+            raise HTTPException(status_code=405, detail=f"Unsupported method for permission check: {method}")
+        if not has_permission(role, module, action):
+            raise HTTPException(status_code=403, detail=f"Missing {module}.{action} permission")
+        return user
+
     return checker
 
 
 # Type aliases for route injection
 CurrentUser = Annotated[User, Depends(get_current_user)]
-AdminOnly = Annotated[User, Depends(require_roles(UserRole.ADMIN))]
-StaffOnly = Annotated[
-    User,
-    Depends(
-        require_roles(
-            UserRole.ADMIN, UserRole.COORDINATOR, UserRole.FACULTY, UserRole.TEACHER
-        )
-    ),
-]
-TeacherOrAdmin = Annotated[
-    User,
-    Depends(
-        require_roles(
-            UserRole.ADMIN, UserRole.COORDINATOR, UserRole.FACULTY, UserRole.TEACHER
-        )
-    ),
-]
+CurrentRole = Annotated[Role | None, Depends(get_current_role)]
+AdminOnly = Annotated[User, Depends(get_current_user)]
+StaffOnly = Annotated[User, Depends(get_current_user)]
+TeacherOrAdmin = Annotated[User, Depends(get_current_user)]
 ParentOnly = Annotated[User, Depends(require_roles(UserRole.PARENT))]

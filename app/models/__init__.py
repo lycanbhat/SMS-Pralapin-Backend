@@ -11,6 +11,7 @@ from app.models.attendance import AttendanceRecord
 from app.models.holiday import Holiday, HolidayCreate, HolidayUpdate, HolidayOut
 from app.models.academic_year import AcademicYear, AcademicYearUpdate, AcademicYearConfigUpdate
 from app.models.gallery import Album, Photo, AlbumCreate, AlbumUpdate
+from app.models.role import Role, PermissionSet, RoleCreateRequest, RoleUpdateRequest, RoleResponse
 
 __all__ = [
     "User",
@@ -50,4 +51,9 @@ __all__ = [
     "Photo",
     "AlbumCreate",
     "AlbumUpdate",
+    "Role",
+    "PermissionSet",
+    "RoleCreateRequest",
+    "RoleUpdateRequest",
+    "RoleResponse",
 ]

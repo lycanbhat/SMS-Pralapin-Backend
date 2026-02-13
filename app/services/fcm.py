@@ -37,7 +37,7 @@ async def send_feed_push(post: FeedPost) -> None:
         return
 
     # 1. Identify target parents
-    query = {"role": UserRole.PARENT}
+    query = {"role": UserRole.PARENT.value}
     
     # If not publish_to_all, filter by branch
     if post.target_branch_ids:
@@ -95,7 +95,7 @@ async def send_attendance_notification(student: Student, log: AttendanceLog) -> 
         return
 
     # Find parent(s) for this student
-    parents = await User.find({"role": UserRole.PARENT, "student_ids": str(student.id)}).to_list()
+    parents = await User.find({"role": UserRole.PARENT.value, "student_ids": str(student.id)}).to_list()
     
     tokens = []
     for parent in parents:

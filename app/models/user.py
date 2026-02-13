@@ -20,7 +20,7 @@ class User(Document):
 
     email: Indexed(EmailStr, unique=True)
     hashed_password: str
-    role: UserRole
+    role: str
     full_name: str
     phone: Optional[str] = None
     is_active: bool = True
@@ -45,7 +45,7 @@ class User(Document):
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
-    role: UserRole
+    role: str
     full_name: str
     phone: Optional[str] = None
     student_ids: list[str] = Field(default_factory=list)
@@ -56,7 +56,7 @@ class UserCreate(BaseModel):
 class UserInDB(BaseModel):
     id: str
     email: str
-    role: UserRole
+    role: str
     full_name: str
     phone: Optional[str] = None
     is_active: bool

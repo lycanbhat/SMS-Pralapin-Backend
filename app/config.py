@@ -1,4 +1,5 @@
 """Application configuration using Pydantic Settings."""
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -40,6 +41,20 @@ class Settings(BaseSettings):
     cctv_base_url: str = ""
     school_hours_start: str = "08:00"
     school_hours_end: str = "18:00"
+
+    # CORS (comma-separated origins, e.g. "https://app.pralapin.com,https://admin.pralapin.com")
+    cors_origins: str = "http://localhost:5173"
+    allow_edit_default_roles: bool = False
+
+    @model_validator(mode="after")
+    def _validate_production_secrets(self):
+        if not self.debug:
+            if self.jwt_secret_key in ("change-me-in-production", ""):
+                raise ValueError(
+                    "JWT_SECRET_KEY must be set to a strong secret when DEBUG is not enabled. "
+                    "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+                )
+        return self
 
 
 settings = Settings()

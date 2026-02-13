@@ -202,7 +202,7 @@ async def profile(user: CurrentUser):
             "full_name": user.full_name,
             "email": user.email,
             "phone": user.phone,
-            "role": user.role.value,
+            "role": user.role,
         },
         "children": children,
     }

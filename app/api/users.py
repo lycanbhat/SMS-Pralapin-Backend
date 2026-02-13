@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 from beanie import PydanticObjectId
 
 from app.api.deps import AdminOnly
-from app.models.user import User, UserCreate, UserRole
+from app.models.user import User, UserCreate
 from app.api.deps import get_password_hash
 from pydantic import BaseModel
 
@@ -17,7 +17,7 @@ class PasswordUpdate(BaseModel):
 @router.get("/")
 async def list_users(user: AdminOnly):
     users = await User.find_all().to_list()
-    return [{"id": str(u.id), "email": u.email, "role": u.role.value, "full_name": u.full_name} for u in users]
+    return [{"id": str(u.id), "email": u.email, "role": u.role, "full_name": u.full_name} for u in users]
 
 
 @router.post("/", status_code=201)
@@ -36,7 +36,7 @@ async def create_user(data: UserCreate, admin: AdminOnly):
         assigned_class_ids=data.assigned_class_ids,
     )
     await u.insert()
-    return {"id": str(u.id), "email": u.email, "role": u.role.value}
+    return {"id": str(u.id), "email": u.email, "role": u.role}
 
 
 @router.post("/{user_id}/set-password")
