@@ -25,14 +25,8 @@ class StaffUpdate(BaseModel):
 
 @router.get("/")
 async def list_staff(admin: AdminOnly):
-    """List all staff members (Admin, Coordinator, Faculty, Teacher)."""
-    staff_roles = [
-        UserRole.ADMIN,
-        UserRole.COORDINATOR,
-        UserRole.FACULTY,
-        UserRole.TEACHER,
-    ]
-    staff = await User.find({"role": {"$in": [r.value for r in staff_roles]}}).to_list()
+    """List all staff members (every role except parent)."""
+    staff = await User.find({"role": {"$ne": UserRole.PARENT.value}}).to_list()
     return [
         {
             "id": str(s.id),
@@ -124,4 +118,7 @@ async def delete_staff(staff_id: str, admin: AdminOnly):
     if not user:
         raise HTTPException(status_code=404, detail="Staff member not found")
     user.is_active = False
+    user.role = ""
+    user.branch_id = None
+    user.assigned_class_ids = []
     await user.save()

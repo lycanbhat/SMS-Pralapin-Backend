@@ -1,7 +1,8 @@
 """AWS S3: photos and PDF receipts."""
 import uuid
-from typing import BinaryIO
-
+from typing import BinaryIO, AsyncGenerator
+import asyncio
+from io import BytesIO
 from app.config import settings
 import boto3
 from botocore.exceptions import ClientError
@@ -69,3 +70,23 @@ async def delete_from_s3(key: str, bucket: str = settings.s3_bucket_photos) -> N
         get_s3().delete_object(Bucket=bucket, Key=key)
     except ClientError:
         pass
+
+
+def _upload_banner_sync(file: bytes, key: str, content_type: str) -> None:
+    get_s3().put_object(
+        Bucket=settings.s3_bucket_photos,
+        Key=key,
+        Body=file,
+        ContentType=content_type or "image/jpeg",
+    )
+
+
+async def upload_banner_to_s3(file: bytes, filename: str, content_type: str) -> tuple[str, str]:
+    """Upload banner image; return (public_url, s3_key)."""
+    import asyncio
+    ext = (filename or "").split(".")[-1] or "jpg"
+    key = f"banners/{uuid.uuid4().hex}.{ext}"
+    bucket = settings.s3_bucket_photos
+    await asyncio.to_thread(_upload_banner_sync, file, key, content_type or "image/jpeg")
+    url = f"https://{bucket}.s3.{settings.aws_region}.amazonaws.com/{key}"
+    return url, key

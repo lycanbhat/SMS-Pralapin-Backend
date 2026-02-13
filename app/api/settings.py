@@ -1,9 +1,10 @@
 """App settings - class options and fee structure metadata."""
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from app.api.deps import AdminOnly, CurrentUser
-from app.models.settings import AppSettings, ClassOptionsUpdate, FeeStructuresUpdate, AcademicYearConfig, CCTVConfigUpdate
+from app.models.settings import AppSettings, ClassOptionsUpdate, FeeStructuresUpdate, AcademicYearConfig, CCTVConfigUpdate, BannerItem, BannerListUpdate
 from app.models.academic_year import AcademicYear, AcademicYearConfigUpdate
 from app.services.academic_year import ensure_academic_year
+from app.services.s3 import upload_banner_to_s3, delete_from_s3
 
 router = APIRouter()
 
@@ -111,3 +112,86 @@ async def update_cctv_config(data: CCTVConfigUpdate, user: AdminOnly):
         settings.cctv_enabled = data.cctv_enabled
         await settings.save()
     return {"cctv_enabled": settings.cctv_enabled}
+
+
+@router.get("/banners")
+async def get_banners(user: CurrentUser):
+    """Get all banners (for admin settings UI)."""
+    settings = await AppSettings.find_one()
+    if not settings:
+        return {"banners": []}
+    banners = settings.banners or []
+    return {
+        "banners": [
+            b.model_dump() if hasattr(b, "model_dump") else b
+            for b in banners
+        ],
+    }
+
+
+@router.post("/banners/upload")
+async def upload_banner(file: UploadFile = File(...), admin: AdminOnly = None):
+    """Upload a new banner image (max 5 total, JPG/PNG, max 5MB)."""
+    settings = await AppSettings.find_one()
+    if not settings:
+        settings = AppSettings()
+        await settings.insert()
+
+    banners = list(settings.banners or [])
+    if len(banners) >= 5:
+        raise HTTPException(status_code=400, detail="Maximum 5 banners allowed")
+
+    content_type = file.content_type or "image/jpeg"
+    if not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image files allowed (JPG, PNG)")
+
+    content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image must be less than 5MB")
+
+    url, s3_key = await upload_banner_to_s3(content, file.filename or "banner.jpg", content_type)
+    banner = BannerItem(url=url, s3_key=s3_key, is_active=True)
+    banners.append(banner)
+    settings.banners = banners
+    await settings.save()
+    return {"banner": banner.model_dump()}
+
+
+@router.put("/banners")
+async def update_banners(data: BannerListUpdate, admin: AdminOnly):
+    """Update banner list (reorder, toggle active). Max 5 banners."""
+    if len(data.banners) > 5:
+        raise HTTPException(status_code=400, detail="Maximum 5 banners allowed")
+
+    settings = await AppSettings.find_one()
+    if not settings:
+        settings = AppSettings()
+        await settings.insert()
+
+    current_keys = {b.s3_key for b in (settings.banners or [])}
+    new_keys = {b.s3_key for b in data.banners}
+    for key in current_keys - new_keys:
+        await delete_from_s3(key)
+
+    settings.banners = data.banners
+    await settings.save()
+    return {"banners": [b.model_dump() for b in data.banners]}
+
+
+@router.delete("/banners/{index:int}")
+async def delete_banner(index: int, admin: AdminOnly):
+    """Delete a banner by index."""
+    settings = await AppSettings.find_one()
+    if not settings:
+        raise HTTPException(status_code=404, detail="No banners found")
+
+    banners = list(settings.banners or [])
+    if index < 0 or index >= len(banners):
+        raise HTTPException(status_code=404, detail="Banner not found")
+
+    banner = banners[index]
+    await delete_from_s3(banner.s3_key)
+    banners.pop(index)
+    settings.banners = banners
+    await settings.save()
+    return {"message": "Banner deleted"}

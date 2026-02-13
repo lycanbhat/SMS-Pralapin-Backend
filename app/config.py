@@ -43,8 +43,11 @@ class Settings(BaseSettings):
     school_hours_end: str = "18:00"
 
     # CORS (comma-separated origins, e.g. "https://app.pralapin.com,https://admin.pralapin.com")
-    cors_origins: str = "http://localhost:5173"
+    cors_origins: str = "http://localhost:5173,https://app.pralapin.com"
     allow_edit_default_roles: bool = False
+    docs_auth_enabled: bool = True
+    docs_auth_username: str = "admin"
+    docs_auth_password: str = "admin"
 
     @model_validator(mode="after")
     def _validate_production_secrets(self):

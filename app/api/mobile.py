@@ -279,6 +279,20 @@ async def list_mobile_announcements(
     }
 
 
+@router.get("/banners")
+async def get_mobile_banners(user: CurrentUser):
+    """Get active banners for mobile app home screen."""
+    settings = await AppSettings.find_one()
+    if not settings or not settings.banners:
+        return {"banners": []}
+    active = []
+    for b in settings.banners:
+        is_active = b.is_active if hasattr(b, "is_active") else b.get("is_active", True)
+        if is_active:
+            active.append(b.model_dump() if hasattr(b, "model_dump") else b)
+    return {"banners": active}
+
+
 @router.get("/announcements/{announcement_id}")
 async def get_mobile_announcement(announcement_id: str, user: ParentOnly):
     oid = safe_object_id(announcement_id)

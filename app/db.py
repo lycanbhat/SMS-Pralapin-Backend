@@ -20,10 +20,15 @@ from app.models import (
 )
 
 
-async def init_db():
-    client = AsyncIOMotorClient(settings.mongodb_url)
+_client = None
+
+
+async def db_startup():
+    """Connect to MongoDB and initialize Beanie ODM."""
+    global _client
+    _client = AsyncIOMotorClient(settings.mongodb_url)
     await init_beanie(
-        database=client[settings.mongodb_db_name],
+        database=_client[settings.mongodb_db_name],
         document_models=[
             User,
             Student,
@@ -40,3 +45,16 @@ async def init_db():
             Role,
         ],
     )
+
+
+async def db_shutdown():
+    """Close MongoDB connection."""
+    global _client
+    if _client:
+        _client.close()
+        _client = None
+
+
+async def init_db():
+    """Alias for db_startup (backward compatibility)."""
+    await db_startup()

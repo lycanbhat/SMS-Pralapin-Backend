@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.api.deps import AdminOnly
 from app.models.role import Role, RoleCreateRequest, RoleUpdateRequest
+from app.models.user import User
 from app.rbac import SYSTEM_MODULES
 from app.services.roles import (
     can_edit_role,
@@ -77,4 +78,24 @@ async def update_role(role_id: str, data: RoleUpdateRequest, user: AdminOnly):
     role.updated_at = datetime.utcnow()
     await role.save()
     return role_to_response(role)
+
+
+@router.delete("/{role_id}", status_code=204)
+async def delete_role(role_id: str, user: AdminOnly):
+    """Delete a custom role. Default roles cannot be deleted."""
+    role = await Role.get(PydanticObjectId(role_id))
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+    if role.is_default:
+        raise HTTPException(status_code=403, detail="Default roles cannot be deleted")
+
+    # Prevent deletion if any users are assigned this role
+    users_with_role = await User.find({"role": role.key}).count()
+    if users_with_role > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete role: {users_with_role} staff member(s) are still assigned to it",
+        )
+
+    await role.delete()
 
