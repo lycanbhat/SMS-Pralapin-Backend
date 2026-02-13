@@ -154,3 +154,4 @@ cython_debug/
 *.json
 !pyproject.toml
 !uv.lock
+pralapin-firebase-adminsdk-fbsvc-000b51b2f2.json
