@@ -152,6 +152,3 @@ cython_debug/
 
 # Firebase Admin SDK secrets
 *.json
-!pyproject.toml
-!uv.lock
-pralapin-firebase-adminsdk-fbsvc-000b51b2f2.json
