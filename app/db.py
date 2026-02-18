@@ -17,6 +17,8 @@ from app.models import (
     AcademicYear,
     Album,
     Role,
+    LessonPlan,
+    Homework,
 )
 
 
@@ -43,6 +45,8 @@ async def db_startup():
             AcademicYear,
             Album,
             Role,
+            LessonPlan,
+            Homework,
         ],
     )
 

@@ -12,6 +12,8 @@ from app.models.holiday import Holiday, HolidayCreate, HolidayUpdate, HolidayOut
 from app.models.academic_year import AcademicYear, AcademicYearUpdate, AcademicYearConfigUpdate
 from app.models.gallery import Album, Photo, AlbumCreate, AlbumUpdate
 from app.models.role import Role, PermissionSet, RoleCreateRequest, RoleUpdateRequest, RoleResponse
+from app.models.lesson_plan import LessonPlan, LessonPlanCreate, LessonPlanUpdate
+from app.models.homework import Homework, HomeworkCreate, HomeworkUpdate
 
 __all__ = [
     "User",
@@ -56,4 +58,10 @@ __all__ = [
     "RoleCreateRequest",
     "RoleUpdateRequest",
     "RoleResponse",
+    "LessonPlan",
+    "LessonPlanCreate",
+    "LessonPlanUpdate",
+    "Homework",
+    "HomeworkCreate",
+    "HomeworkUpdate",
 ]

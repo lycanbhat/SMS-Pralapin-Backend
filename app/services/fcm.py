@@ -7,6 +7,7 @@ import logging
 from app.models.feed import FeedPost
 from app.models.student import Student, AttendanceLog
 from app.models.user import User, UserRole
+from app.models.homework import Homework
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -126,3 +127,65 @@ async def send_attendance_notification(student: Student, log: AttendanceLog) -> 
             messaging.send_each_for_multicast(message)
         except Exception as e:
             logger.error(f"FCM attendance notification failed: {e}")
+
+
+async def send_homework_notification(hw: Homework) -> None:
+    """Notify parents when homework is added for a class.
+
+    Title format: "<Child's name>'s homework for <added date>"
+    Body: homework title.
+    """
+    app = _get_firebase_app()
+    if not app:
+        return
+
+    # Find students in this class + branch
+    students = await Student.find(
+        {"branch_id": hw.branch_id, "class_id": hw.class_id, "is_active": True}
+    ).to_list()
+    if not students:
+        return
+
+    # For each student, send personalised notification to their parents
+    for student in students:
+        parents = await User.find(
+            {
+                "role": UserRole.PARENT.value,
+                "student_ids": str(student.id),
+            }
+        ).to_list()
+
+        tokens: List[str] = []
+        for parent in parents:
+            if parent.fcm_tokens:
+                tokens.extend(parent.fcm_tokens)
+
+        if not tokens:
+            continue
+
+        date_text = (
+            hw.date.strftime("%d %b %Y") if hasattr(hw.date, "strftime") else str(hw.date)
+        )
+        title = f"{student.full_name}'s homework for {date_text}"
+        body = hw.title
+
+        for i in range(0, len(tokens), 500):
+            batch = tokens[i : i + 500]
+            message = messaging.MulticastMessage(
+                notification=messaging.Notification(
+                    title=title,
+                    body=body,
+                ),
+                data={
+                    "type": "homework",
+                    "homework_id": str(hw.id),
+                    "student_id": str(student.id),
+                    "class_id": hw.class_id,
+                    "date": str(hw.date),
+                },
+                tokens=batch,
+            )
+            try:
+                messaging.send_each_for_multicast(message)
+            except Exception as e:
+                logger.error(f"FCM homework notification failed: {e}")

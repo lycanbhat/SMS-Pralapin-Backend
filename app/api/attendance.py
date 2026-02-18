@@ -243,9 +243,15 @@ async def finalize_attendance(
         {"branch_id": branch_id, "class_id": class_id, "date": d}
     )
     if not record:
-        raise HTTPException(
-            status_code=404, detail="Attendance record not found for this date"
+        # Create an empty record so we can finalize (lock) the date even if nothing was marked yet
+        record = AttendanceRecord(
+            branch_id=branch_id,
+            class_id=class_id,
+            date=d,
+            marked_by=str(user.id),
+            attendance=[],
         )
+        await record.insert()
 
     record.is_finalized = True
     record.finalized_at = datetime.utcnow()

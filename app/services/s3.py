@@ -81,6 +81,35 @@ def _upload_banner_sync(file: bytes, key: str, content_type: str) -> None:
     )
 
 
+async def upload_student_photo_to_s3(file, *, student_id: str) -> tuple[str, str]:
+    """Upload student profile photo; return (public_url, s3_key)."""
+    ext = (file.filename or "").split(".")[-1] or "jpg"
+    key = f"profile_photos/{student_id}/{uuid.uuid4().hex}.{ext}"
+    bucket = settings.s3_bucket_photos
+    content = await file.read()
+    content_type = file.content_type or "image/jpeg"
+    get_s3().put_object(Bucket=bucket, Key=key, Body=content, ContentType=content_type)
+    url = f"https://{bucket}.s3.{settings.aws_region}.amazonaws.com/{key}"
+    return url, key
+
+
+async def upload_student_document_to_s3(
+    file,
+    *,
+    student_id: str,
+    doc_type: str,
+) -> tuple[str, str]:
+    """Upload student document (PDF/image); return (public_url, s3_key)."""
+    ext = (file.filename or "").split(".")[-1] or "pdf"
+    key = f"documents/{student_id}/{doc_type}/{uuid.uuid4().hex}.{ext}"
+    bucket = settings.s3_bucket_photos
+    content = await file.read()
+    content_type = file.content_type or ("application/pdf" if ext.lower() == "pdf" else "image/jpeg")
+    get_s3().put_object(Bucket=bucket, Key=key, Body=content, ContentType=content_type)
+    url = f"https://{bucket}.s3.{settings.aws_region}.amazonaws.com/{key}"
+    return url, key
+
+
 async def upload_banner_to_s3(file: bytes, filename: str, content_type: str) -> tuple[str, str]:
     """Upload banner image; return (public_url, s3_key)."""
     import asyncio

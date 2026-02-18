@@ -1,10 +1,11 @@
 """Student CRUD - child info, class assignments."""
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, UploadFile, File
 from beanie import PydanticObjectId
 from pydantic import BaseModel
 
 from app.api.deps import CurrentUser, TeacherOrAdmin, AdminOnly, get_password_hash
+from app.services.s3 import upload_student_document_to_s3, upload_student_photo_to_s3
 from app.models.user import User, UserRole
 from app.models.student import (
     Student,
@@ -170,6 +171,7 @@ async def get_student(student_id: str, user: CurrentUser):
         "secondary_guardian": s.secondary_guardian.model_dump() if s.secondary_guardian else None,
         "emergency_contact": s.emergency_contact.model_dump() if s.emergency_contact else None,
         "attendance_logs": s.attendance_logs,
+        "documents": s.documents or {},
     }
 
 
@@ -195,6 +197,50 @@ async def update_student(student_id: str, data: StudentUpdate, user: TeacherOrAd
     if "photo_url" in update_data:
         out["photo_url"] = s.photo_url
     return out
+
+
+DOC_TYPES = {"birth_certificate", "guardian_aadhar", "address_proof"}
+
+
+@router.post("/{student_id}/photo")
+async def upload_student_photo(
+    student_id: str,
+    user: TeacherOrAdmin,
+    file: UploadFile = File(...),
+):
+    """Upload student profile photo to S3 and set student.photo_url."""
+    s = await Student.get(PydanticObjectId(student_id))
+    if not s:
+        raise HTTPException(status_code=404, detail="Student not found")
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image (e.g. JPEG, PNG)")
+    url, _ = await upload_student_photo_to_s3(file, student_id=student_id)
+    s.photo_url = url
+    s.updated_at = datetime.utcnow()
+    await s.save()
+    return {"photo_url": url}
+
+
+@router.post("/{student_id}/documents/{doc_type}")
+async def upload_student_document(
+    student_id: str,
+    doc_type: str,
+    user: TeacherOrAdmin,
+    file: UploadFile = File(...),
+):
+    """Upload a student document (birth_certificate, guardian_aadhar, address_proof) to S3."""
+    if doc_type not in DOC_TYPES:
+        raise HTTPException(status_code=400, detail=f"Invalid doc_type. Must be one of: {', '.join(DOC_TYPES)}")
+    s = await Student.get(PydanticObjectId(student_id))
+    if not s:
+        raise HTTPException(status_code=404, detail="Student not found")
+    url, _ = await upload_student_document_to_s3(file, student_id=student_id, doc_type=doc_type)
+    if not s.documents:
+        s.documents = {}
+    s.documents[doc_type] = url
+    s.updated_at = datetime.utcnow()
+    await s.save()
+    return {"url": url, "doc_type": doc_type}
 
 
 @router.delete("/{student_id}", status_code=204)

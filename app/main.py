@@ -34,7 +34,26 @@ app.add_middleware(
 
 
 # API routes
-from app.api import auth, users, students, activities, billing, branches, settings as settings_api, feed, cctv, attendance, mobile, staff, holidays, dashboard, gallery, roles
+from app.api import (
+    auth,
+    users,
+    students,
+    activities,
+    billing,
+    branches,
+    settings as settings_api,
+    feed,
+    cctv,
+    attendance,
+    mobile,
+    staff,
+    holidays,
+    dashboard,
+    gallery,
+    roles,
+    lesson_plans,
+    homework,
+)
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(students.router, prefix="/api/students", tags=["Students"])
@@ -51,6 +70,8 @@ app.include_router(staff.router, prefix="/api/staff", tags=["Staff"])
 app.include_router(holidays.router, prefix="/api/holidays", tags=["Holidays"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(gallery.router, prefix="/api/gallery", tags=["Gallery"])
+app.include_router(lesson_plans.router, prefix="/api/lesson-plans", tags=["Lesson Plans"])
+app.include_router(homework.router, prefix="/api/homework", tags=["Homework"])
 
 
 from app.services.roles import ensure_default_roles

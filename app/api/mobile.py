@@ -6,6 +6,8 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.api.deps import CurrentUser, ParentOnly
 from app.models.branch import Branch
+from app.models.lesson_plan import LessonPlan
+from app.models.homework import Homework
 from app.models.feed import FeedPost
 from app.models.settings import AppSettings
 from app.models.student import Student
@@ -131,6 +133,48 @@ async def dashboard(user: CurrentUser, student_id: str | None = None):
     settings = await AppSettings.find_one()
     cctv_enabled = settings.cctv_enabled if settings else True
 
+    # Today's lesson plans & homework for the selected student's class
+    todays_lesson_plans: list[dict] = []
+    todays_homework: dict | None = None
+
+    try:
+        if selected_student.class_id and selected_student.branch_id:
+            lesson_plans = await LessonPlan.find(
+                {
+                    "branch_id": selected_student.branch_id,
+                    "class_id": selected_student.class_id,
+                    "date": today,
+                }
+            ).to_list()
+            todays_lesson_plans = [
+                {
+                    "id": str(p.id),
+                    "title": p.title,
+                    "description": p.description,
+                    "description_html": p.description_html,
+                }
+                for p in lesson_plans
+            ]
+
+            hw = await Homework.find_one(
+                {
+                    "branch_id": selected_student.branch_id,
+                    "class_id": selected_student.class_id,
+                    "date": today,
+                }
+            )
+            if hw:
+                todays_homework = {
+                    "id": str(hw.id),
+                    "title": hw.title,
+                    "description": hw.description,
+                    "description_html": hw.description_html,
+                }
+    except Exception:
+        # Mobile dashboard should not fail if these optional sections error
+        todays_lesson_plans = []
+        todays_homework = None
+
     return {
         "parent": {
             "id": str(user.id),
@@ -140,12 +184,17 @@ async def dashboard(user: CurrentUser, student_id: str | None = None):
         "student": {
             "id": str(selected_student.id),
             "full_name": selected_student.full_name,
+            "photo_url": selected_student.photo_url,
             "admission_number": selected_student.admission_number,
+            "class_id": selected_student.class_id,
             "class_name": selected_student.class_name,
+            "branch_id": selected_student.branch_id,
             "branch_name": branch_name,
             "class_timings": class_timings,
         },
         "cctv_enabled": cctv_enabled,
+        "todays_lesson_plans": todays_lesson_plans,
+        "todays_homework": todays_homework,
         "attendance_last_6_days": attendance_last_6_days,
         "latest_announcement": latest_announcement_payload,
         "latest_news": latest_news_payload,
@@ -185,6 +234,7 @@ async def profile(user: CurrentUser):
             {
                 "id": str(s.id),
                 "full_name": s.full_name,
+                "photo_url": s.photo_url,
                 "admission_number": s.admission_number,
                 "class_name": s.class_name,
                 "roll_number": s.roll_number,

@@ -52,6 +52,9 @@ class Student(Document):
 
     photo_url: Optional[str] = None  # student photo URL (uploaded document)
 
+    # Student documents (S3 URLs): birth_certificate, guardian_aadhar, address_proof
+    documents: dict[str, str] = Field(default_factory=dict)  # doc_type -> url
+
     is_active: bool = True
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
