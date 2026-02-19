@@ -119,3 +119,33 @@ async def upload_banner_to_s3(file: bytes, filename: str, content_type: str) -> 
     await asyncio.to_thread(_upload_banner_sync, file, key, content_type or "image/jpeg")
     url = f"https://{bucket}.s3.{settings.aws_region}.amazonaws.com/{key}"
     return url, key
+
+
+async def upload_content_image_to_s3(file) -> tuple[str, str]:
+    """Upload image for feed/lesson plan content; return (public_url, s3_key)."""
+    ext = (file.filename or "").split(".")[-1].lower() or "jpg"
+    if ext not in ("jpg", "jpeg", "png", "gif", "webp"):
+        ext = "jpg"
+    key = f"content_images/{uuid.uuid4().hex}.{ext}"
+    bucket = settings.s3_bucket_photos
+    content = await file.read()
+    content_type = file.content_type or "image/jpeg"
+    get_s3().put_object(Bucket=bucket, Key=key, Body=content, ContentType=content_type)
+    url = f"https://{bucket}.s3.{settings.aws_region}.amazonaws.com/{key}"
+    return url, key
+
+
+async def upload_homework_attachment_to_s3(file) -> tuple[str, str]:
+    """Upload homework attachment (PDF, jpeg, jpg, png); return (public_url, s3_key)."""
+    ext = (file.filename or "").split(".")[-1].lower() or "pdf"
+    if ext not in ("pdf", "jpeg", "jpg", "png"):
+        ext = "pdf"
+    key = f"homework_attachments/{uuid.uuid4().hex}.{ext}"
+    bucket = settings.s3_bucket_photos
+    content = await file.read()
+    content_type = file.content_type or (
+        "application/pdf" if ext == "pdf" else "image/jpeg"
+    )
+    get_s3().put_object(Bucket=bucket, Key=key, Body=content, ContentType=content_type)
+    url = f"https://{bucket}.s3.{settings.aws_region}.amazonaws.com/{key}"
+    return url, key

@@ -156,6 +156,8 @@ def serialize_announcement(
         if url_match:
             image_url = (url_match.group(1) or "").strip() or None
 
+    tags: list[str] = getattr(post, "tags", None) or []
+
     return {
         "id": str(post.id),
         "title": post.title,
@@ -173,6 +175,7 @@ def serialize_announcement(
         "author_id": post.author_id,
         "author_name": author_name_map.get(post.author_id, ""),
         "is_pinned": post.is_pinned,
+        "tags": tags,
         "created_at": post.created_at.isoformat() if post.created_at else None,
         "updated_at": post.updated_at.isoformat() if post.updated_at else None,
     }

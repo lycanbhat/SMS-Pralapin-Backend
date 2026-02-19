@@ -2,7 +2,7 @@
 from datetime import datetime
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 
 from app.api.deps import CurrentUser, TeacherOrAdmin
 from app.models.branch import Branch
@@ -21,8 +21,18 @@ from app.services.announcements import (
     unique_branch_ids,
 )
 from app.services.fcm import send_feed_push
+from app.services.s3 import upload_content_image_to_s3
 
 router = APIRouter()
+
+
+@router.post("/upload-image")
+async def upload_content_image(file: UploadFile = File(...), user: TeacherOrAdmin = ...):
+    """Upload an image for use in announcements or lesson plans. Returns the public URL."""
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image (e.g. JPEG, PNG)")
+    url, _ = await upload_content_image_to_s3(file)
+    return {"url": url}
 
 
 def _resolve_target_branches(payload: FeedPostCreate) -> list[str]:
@@ -85,6 +95,7 @@ async def _create_post(payload: FeedPostCreate, user: TeacherOrAdmin) -> FeedPos
     if not content and content_html:
         content = plain_text_from_html(content_html)
 
+    tags = [t for t in (getattr(payload, "tags", None) or []) if (t or "").strip()]
     post = FeedPost(
         branch_id=(target_branch_ids[0] if len(target_branch_ids) == 1 else None),
         target_branch_ids=target_branch_ids,
@@ -93,6 +104,7 @@ async def _create_post(payload: FeedPostCreate, user: TeacherOrAdmin) -> FeedPos
         content_html=content_html,
         author_id=payload.author_id or str(user.id),
         is_pinned=payload.is_pinned,
+        tags=tags,
         updated_at=datetime.utcnow(),
     )
     await post.insert()
@@ -239,6 +251,8 @@ async def update_announcement(post_id: str, payload: FeedPostUpdate, user: Teach
             post.content = plain_text_from_html(update_data["content_html"])
     if "is_pinned" in update_data:
         post.is_pinned = update_data["is_pinned"]
+    if "tags" in update_data:
+        post.tags = [t for t in (update_data["tags"] or []) if (t or "").strip()]
 
     post.updated_at = datetime.utcnow()
     await post.save()

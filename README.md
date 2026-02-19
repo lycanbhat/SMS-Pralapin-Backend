@@ -26,6 +26,15 @@ uv run uvicorn app.main:app --reload --port 8000 --host 0.0.0.0
 
 Use `--host 0.0.0.0` when testing the mobile app on a physical device so the backend accepts connections from your network.
 
+## Push notifications (FCM)
+
+Announcements (and attendance/homework) trigger push notifications to the parent app when:
+
+1. **Firebase is configured** – In `.env`, set `FIREBASE_CREDENTIALS_PATH` to the **absolute or relative path** of your Firebase project’s **service account JSON** (e.g. `./pralapin-firebase-adminsdk.json`). Download it from Firebase Console → Project settings → Service accounts → “Generate new private key”.
+2. **Parents have registered a device** – Each parent must open the **mobile app while logged in** at least once so their FCM token is sent to the backend (`POST /api/auth/fcm-token`). After that, they will receive pushes when you create an announcement (or mark attendance, add homework).
+
+If pushes don’t appear, check backend logs after creating an announcement: you’ll see either “Firebase not configured”, “no FCM tokens found”, or “Announcement push: success=…”.
+
 ## Collections
 
 - **users** – RBAC (Admin, Teacher, Parent)

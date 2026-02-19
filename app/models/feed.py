@@ -28,6 +28,9 @@ class FeedPost(Document):
     view_count: int = 0
     viewer_ids: list[str] = Field(default_factory=list)
 
+    # Tags/categories (e.g. #SchoolUpdate, #ImportantNotice, #HolidayNotice)
+    tags: list[str] = Field(default_factory=list)
+
     class Settings:
         name = "feed"
         use_state_management = True
@@ -42,6 +45,7 @@ class FeedPostCreate(BaseModel):
     publish_to_all: bool = True
     target_branch_ids: list[str] = Field(default_factory=list)
     is_pinned: bool = False
+    tags: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_payload(self):
@@ -68,3 +72,4 @@ class FeedPostUpdate(BaseModel):
     publish_to_all: Optional[bool] = None
     target_branch_ids: Optional[list[str]] = None
     is_pinned: Optional[bool] = None
+    tags: Optional[list[str]] = None

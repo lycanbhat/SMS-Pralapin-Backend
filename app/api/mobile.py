@@ -156,19 +156,31 @@ async def dashboard(user: CurrentUser, student_id: str | None = None):
                 for p in lesson_plans
             ]
 
-            hw = await Homework.find_one(
-                {
-                    "branch_id": selected_student.branch_id,
-                    "class_id": selected_student.class_id,
-                    "date": today,
-                }
+            # If multiple homework entries exist for the same class & date,
+            # show the latest one (by created_at) in the dashboard card.
+            hw_items = (
+                await Homework.find(
+                    {
+                        "branch_id": selected_student.branch_id,
+                        "class_id": selected_student.class_id,
+                        "date": today,
+                    }
+                )
+                .sort("-created_at")
+                .limit(1)
+                .to_list()
             )
-            if hw:
+            if hw_items:
+                hw = hw_items[0]
                 todays_homework = {
                     "id": str(hw.id),
                     "title": hw.title,
                     "description": hw.description,
                     "description_html": hw.description_html,
+                    "date": hw.date,
+                    "submission_date": hw.submission_date,
+                    "attachment_url": hw.attachment_url,
+                    "attachment_filename": hw.attachment_filename,
                 }
     except Exception:
         # Mobile dashboard should not fail if these optional sections error
