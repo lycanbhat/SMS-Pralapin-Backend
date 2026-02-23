@@ -1,7 +1,7 @@
 """App settings - class options and fee structure metadata."""
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from app.api.deps import AdminOnly, CurrentUser
-from app.models.settings import AppSettings, ClassOptionsUpdate, FeeStructuresUpdate, AcademicYearConfig, CCTVConfigUpdate, BannerItem, BannerListUpdate
+from app.models.settings import AppSettings, ClassOptionsUpdate, FeeStructuresUpdate, AcademicYearConfig, CCTVConfigUpdate, AdsConfigUpdate, BannerItem, BannerListUpdate
 from app.models.academic_year import AcademicYear, AcademicYearConfigUpdate
 from app.services.academic_year import ensure_academic_year
 from app.services.s3 import upload_banner_to_s3, delete_from_s3
@@ -112,6 +112,24 @@ async def update_cctv_config(data: CCTVConfigUpdate, user: AdminOnly):
         settings.cctv_enabled = data.cctv_enabled
         await settings.save()
     return {"cctv_enabled": settings.cctv_enabled}
+
+
+@router.get("/ads-config")
+async def get_ads_config(user: CurrentUser):
+    settings = await AppSettings.find_one()
+    return {"ads_enabled": settings.ads_enabled if settings else False}
+
+
+@router.put("/ads-config")
+async def update_ads_config(data: AdsConfigUpdate, admin: AdminOnly):
+    settings = await AppSettings.find_one()
+    if not settings:
+        settings = AppSettings(ads_enabled=data.ads_enabled)
+        await settings.insert()
+    else:
+        settings.ads_enabled = data.ads_enabled
+        await settings.save()
+    return {"ads_enabled": settings.ads_enabled}
 
 
 @router.get("/banners")

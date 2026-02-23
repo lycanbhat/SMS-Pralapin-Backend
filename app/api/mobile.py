@@ -58,6 +58,8 @@ def _attendance_status_for_date(student: Student, for_date: date) -> str:
 async def dashboard(user: CurrentUser, student_id: str | None = None):
     students = await _linked_students(user)
     if not students:
+        settings_empty = await AppSettings.find_one()
+        ads_enabled_empty = getattr(settings_empty, "ads_enabled", False) if settings_empty else False
         return {
             "parent": {
                 "id": str(user.id),
@@ -68,6 +70,8 @@ async def dashboard(user: CurrentUser, student_id: str | None = None):
             "attendance_last_5_days": [],
             "latest_announcement": None,
             "latest_news": None,
+            "cctv_enabled": settings_empty.cctv_enabled if settings_empty else True,
+            "ads_enabled": ads_enabled_empty,
             "quick_links": [
                 {"title": "Attendance", "route": "/attendance"},
                 {"title": "Announcements", "route": "/feed"},
@@ -132,6 +136,7 @@ async def dashboard(user: CurrentUser, student_id: str | None = None):
 
     settings = await AppSettings.find_one()
     cctv_enabled = settings.cctv_enabled if settings else True
+    ads_enabled = getattr(settings, "ads_enabled", False) if settings else False
 
     # Today's lesson plans & homework for the selected student's class
     todays_lesson_plans: list[dict] = []
@@ -205,6 +210,7 @@ async def dashboard(user: CurrentUser, student_id: str | None = None):
             "class_timings": class_timings,
         },
         "cctv_enabled": cctv_enabled,
+        "ads_enabled": ads_enabled,
         "todays_lesson_plans": todays_lesson_plans,
         "todays_homework": todays_homework,
         "attendance_last_6_days": attendance_last_6_days,
@@ -218,6 +224,16 @@ async def dashboard(user: CurrentUser, student_id: str | None = None):
             {"title": "Calendar", "route": "/calendar"},
             {"title": "Homework", "route": "/homework"},
         ],
+    }
+
+
+@router.get("/app-config")
+async def app_config(user: CurrentUser):
+    """Lightweight config for mobile (cctv_enabled, ads_enabled). Used by screens that do not load the full dashboard."""
+    settings = await AppSettings.find_one()
+    return {
+        "cctv_enabled": settings.cctv_enabled if settings else True,
+        "ads_enabled": getattr(settings, "ads_enabled", False) if settings else False,
     }
 
 

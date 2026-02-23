@@ -40,6 +40,7 @@ class AppSettings(Document):
     fee_structures: list[FeeStructureItem] = Field(default_factory=list)  # Multiple fee structure templates
     academic_year_config: AcademicYearConfig = Field(default_factory=AcademicYearConfig)
     cctv_enabled: bool = True  # Global toggle for parent CCTV access
+    ads_enabled: bool = False  # Global toggle for ads in mobile app (controlled from web)
     banners: list[BannerItem] = Field(default_factory=list)  # Mobile app banners (max 5)
 
     class Settings:
@@ -57,6 +58,10 @@ class FeeStructuresUpdate(BaseModel):
 
 class CCTVConfigUpdate(BaseModel):
     cctv_enabled: bool
+
+
+class AdsConfigUpdate(BaseModel):
+    ads_enabled: bool
 
 
 class BannerList(BaseModel):
