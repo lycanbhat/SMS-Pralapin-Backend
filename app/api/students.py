@@ -20,7 +20,7 @@ router = APIRouter()
 
 
 class ParentAccountRequest(BaseModel):
-    password: str
+    password: str | None = None
 
 
 async def _next_admission_number(branch_id: str) -> str:
@@ -193,9 +193,30 @@ async def update_student(student_id: str, data: StudentUpdate, user: TeacherOrAd
         setattr(s, key, value)
     s.updated_at = datetime.utcnow()
     await s.save()
-    out = {"id": str(s.id), "full_name": s.full_name}
-    if "photo_url" in update_data:
-        out["photo_url"] = s.photo_url
+    out = {
+        "id": str(s.id),
+        "full_name": s.full_name,
+        "photo_url": s.photo_url,
+        "gender": s.gender,
+        "date_of_birth": s.date_of_birth,
+        "address": s.address,
+        "city": s.city,
+        "state": s.state,
+        "pincode": s.pincode,
+        "parent_user_id": s.parent_user_id or None,
+        "branch_id": s.branch_id,
+        "class_id": s.class_id,
+        "class_name": s.class_name,
+        "roll_number": s.roll_number,
+        "academic_year": s.academic_year,
+        "admission_number": s.admission_number,
+        "is_active": s.is_active,
+        "primary_guardian": s.primary_guardian.model_dump() if s.primary_guardian else None,
+        "secondary_guardian": s.secondary_guardian.model_dump() if s.secondary_guardian else None,
+        "emergency_contact": s.emergency_contact.model_dump() if s.emergency_contact else None,
+        "attendance_logs": s.attendance_logs,
+        "documents": s.documents or {},
+    }
     return out
 
 
@@ -256,60 +277,79 @@ async def archive_student(student_id: str, user: TeacherOrAdmin):
 
 @router.post("/{student_id}/parent-account")
 async def set_parent_account(student_id: str, data: ParentAccountRequest, admin: AdminOnly):
-    """Create or update the parent login for this student using the primary guardian email."""
+    """Create or update parent logins for this student using primary and secondary guardians."""
     s = await Student.get(PydanticObjectId(student_id))
     if not s:
         raise HTTPException(status_code=404, detail="Student not found")
-    if not s.primary_guardian or not s.primary_guardian.email:
-        raise HTTPException(status_code=400, detail="Primary guardian email is required to create parent login")
-
-    guardian = s.primary_guardian
-    email = guardian.email
-    full_name = guardian.name or s.full_name
-    phone = guardian.phone
-
-    user: User | None = None
-
-    # If student already linked to a parent user, update that user's password.
-    if s.parent_user_id:
-        try:
-            user = await User.get(PydanticObjectId(s.parent_user_id))
-        except Exception:
-            user = None
-
-    # Otherwise, see if a parent user already exists with this email.
-    if not user:
-        existing = await User.find_one(User.email == email)
-        if existing and existing.role == UserRole.PARENT:
-            user = existing
-
-    # If still no user, create a new parent user.
-    if not user:
-        user = User(
-            email=email,
-            hashed_password=get_password_hash(data.password),
-            role=UserRole.PARENT,
-            full_name=full_name,
-            phone=phone,
-            student_ids=[str(s.id)],
-            branch_id=s.branch_id,
-            assigned_class_ids=[],
+    if not s.primary_guardian or not s.primary_guardian.phone or not s.primary_guardian.email:
+        raise HTTPException(
+            status_code=400,
+            detail="Primary guardian's phone number and email are required to create parent login"
         )
-        await user.insert()
-    else:
-        # Update password and ensure student is linked.
-        user.hashed_password = get_password_hash(data.password)
-        if str(s.id) not in user.student_ids:
-            user.student_ids.append(str(s.id))
-        await user.save()
 
-    # Link student back to parent user.
-    s.parent_user_id = str(user.id)
-    s.updated_at = datetime.utcnow()
-    await s.save()
+    guardians_to_process = []
+    if s.primary_guardian and s.primary_guardian.phone and s.primary_guardian.email:
+        guardians_to_process.append(s.primary_guardian)
+    if s.secondary_guardian and s.secondary_guardian.phone and s.secondary_guardian.email:
+        guardians_to_process.append(s.secondary_guardian)
+
+    primary_user_id = None
+    created_or_updated_users = []
+
+    for idx, guardian in enumerate(guardians_to_process):
+        email = guardian.email
+        full_name = guardian.name or s.full_name
+        phone = guardian.phone
+
+        user: User | None = None
+
+        # Check if user already exists with this phone number.
+        user = await User.find_one(User.role == UserRole.PARENT, User.phone == phone)
+
+        # Otherwise, check by email.
+        if not user:
+            user = await User.find_one(User.role == UserRole.PARENT, User.email == email)
+
+        # If still no user, create a new parent user.
+        if not user:
+            pwd = data.password if data.password else "OTP_LOGIN_ONLY_PLACEHOLDER"
+            user = User(
+                email=email,
+                hashed_password=get_password_hash(pwd),
+                role=UserRole.PARENT,
+                full_name=full_name,
+                phone=phone,
+                student_ids=[str(s.id)],
+                branch_id=s.branch_id,
+                assigned_class_ids=[],
+            )
+            await user.insert()
+        else:
+            # Update details and ensure student is linked.
+            if data.password:
+                user.hashed_password = get_password_hash(data.password)
+            if str(s.id) not in user.student_ids:
+                user.student_ids.append(str(s.id))
+            if not user.phone:
+                user.phone = phone
+            await user.save()
+
+        if idx == 0:
+            primary_user_id = str(user.id)
+            
+        created_or_updated_users.append({
+            "user_id": str(user.id),
+            "email": user.email,
+            "phone": user.phone,
+            "name": user.full_name,
+        })
+
+    if primary_user_id:
+        s.parent_user_id = primary_user_id
+        s.updated_at = datetime.utcnow()
+        await s.save()
 
     return {
-        "parent_user_id": s.parent_user_id,
-        "user_id": str(user.id),
-        "email": user.email,
+        "parent_user_id": primary_user_id,
+        "users": created_or_updated_users,
     }

@@ -30,6 +30,87 @@ class FCMTokenRequest(BaseModel):
     token: str
 
 
+class ParentOTPLoginRequest(BaseModel):
+    id_token: str
+
+
+@router.post("/parent/login-otp", response_model=TokenResponse)
+async def parent_login_otp(req: ParentOTPLoginRequest):
+    import firebase_admin.auth as firebase_auth
+    from app.services.fcm import _get_firebase_app
+    import re
+    
+    app = _get_firebase_app()
+    if not app:
+        raise HTTPException(
+            status_code=500,
+            detail="Firebase Authentication is not configured on the server."
+        )
+    
+    try:
+        decoded_token = firebase_auth.verify_id_token(req.id_token, app=app)
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Invalid Firebase ID Token: {e}")
+        
+    phone_number = decoded_token.get("phone_number")
+    if not phone_number:
+        raise HTTPException(status_code=400, detail="Phone number not found in Firebase Token")
+        
+    def normalize_phone(p: str | None) -> str:
+        if not p:
+            return ""
+        return re.sub(r"\D", "", p)
+        
+    norm_target = normalize_phone(phone_number)
+    
+    # Try exact match first
+    user = await User.find_one(User.role == "parent", User.phone == phone_number)
+    
+    if not user:
+        # Fallback 1: scan all active parents by normalized/suffix matching
+        all_parents = await User.find(User.role == "parent", User.is_active == True).to_list()
+        for p in all_parents:
+            if p.phone:
+                p_norm = normalize_phone(p.phone)
+                if p_norm == norm_target:
+                    user = p
+                    break
+                if len(p_norm) >= 10 and len(norm_target) >= 10:
+                    if p_norm[-10:] == norm_target[-10:]:
+                        user = p
+                        break
+                        
+    if not user:
+        # Fallback 2: check if the phone number belongs to a primary or secondary guardian of any student
+        from app.models.student import Student as StudentModel
+        all_students = await StudentModel.find(StudentModel.is_active == True).to_list()
+        for s in all_students:
+            for g in [s.primary_guardian, s.secondary_guardian]:
+                if g and g.phone:
+                    g_norm = normalize_phone(g.phone)
+                    if g_norm == norm_target or (len(g_norm) >= 10 and len(norm_target) >= 10 and g_norm[-10:] == norm_target[-10:]):
+                        if s.parent_user_id:
+                            try:
+                                user = await User.get(PydanticObjectId(s.parent_user_id))
+                                if user:
+                                    break
+                            except Exception:
+                                pass
+            if user:
+                break
+                        
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Parent account with phone number {phone_number} is not registered."
+        )
+        
+    from app.api.deps import create_refresh_token
+    access_token = create_access_token(str(user.id), user.role)
+    refresh_token = create_refresh_token(str(user.id))
+    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+
+
 @router.post("/login", response_model=TokenResponse)
 async def login(req: LoginRequest):
     user = await User.find_one(User.email == req.email)
