@@ -61,3 +61,18 @@ async def get_stream_url(student_id: str, stream_id: str, user: ParentOnly):
         raise HTTPException(status_code=404, detail="Stream not found or disabled")
     signed_url = generate_signed_stream_url(config, student_id=student_id)
     return {"url": signed_url, "expires_in_seconds": 3600}
+
+
+from app.api.deps import AdminOnly
+
+@router.get("/preview-url")
+async def get_preview_url(branch_id: str, stream_id: str, user: AdminOnly):
+    """Generate a signed preview URL for admin preview (bypasses class hours)."""
+    branch = await Branch.get(PydanticObjectId(branch_id))
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+    config = next((c for c in branch.cctv_configs if c.stream_id == stream_id), None)
+    if not config or not config.enabled:
+        raise HTTPException(status_code=404, detail="Stream not found or disabled")
+    signed_url = generate_signed_stream_url(config, student_id="admin-preview", expires_in=7200)
+    return {"url": signed_url}
