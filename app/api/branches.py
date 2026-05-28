@@ -23,6 +23,7 @@ async def list_branches(user: CurrentUser):
                     "fee_structure_name": m.fee_structure_name,
                     "start_time": m.start_time,
                     "end_time": m.end_time,
+                    "cctv_stream_id": getattr(m, "cctv_stream_id", None),
                 } for m in getattr(b, "class_fee_structures", []) or []
             ],
             "google_location": getattr(b, "google_location", None),
@@ -32,7 +33,16 @@ async def list_branches(user: CurrentUser):
             "pincode": getattr(b, "pincode", None),
             "phone": b.phone,
             "coordinator_id": getattr(b, "coordinator_id", None),
-            "cctv_configs": [{"stream_id": c.stream_id, "name": c.name} for c in b.cctv_configs],
+            "cctv_configs": [
+                {
+                    "stream_id": c.stream_id,
+                    "name": c.name,
+                    "description": getattr(c, "description", "") or "",
+                    "hls_playlist_url": c.hls_playlist_url,
+                    "token_secret": c.token_secret,
+                    "enabled": c.enabled,
+                } for c in b.cctv_configs
+            ],
         }
         for b in branches
     ]
@@ -66,6 +76,7 @@ async def get_branch(branch_id: str, user: CurrentUser):
                 "fee_structure_name": m.fee_structure_name,
                 "start_time": m.start_time,
                 "end_time": m.end_time,
+                "cctv_stream_id": getattr(m, "cctv_stream_id", None),
             } for m in getattr(b, "class_fee_structures", []) or []
         ],
         "google_location": getattr(b, "google_location", None),
@@ -75,7 +86,16 @@ async def get_branch(branch_id: str, user: CurrentUser):
         "pincode": getattr(b, "pincode", None),
         "phone": b.phone,
         "coordinator_id": getattr(b, "coordinator_id", None),
-        "cctv_configs": [{"stream_id": c.stream_id, "name": c.name} for c in b.cctv_configs],
+        "cctv_configs": [
+            {
+                "stream_id": c.stream_id,
+                "name": c.name,
+                "description": getattr(c, "description", "") or "",
+                "hls_playlist_url": c.hls_playlist_url,
+                "token_secret": c.token_secret,
+                "enabled": c.enabled,
+            } for c in b.cctv_configs
+        ],
     }
 
 
@@ -101,6 +121,7 @@ async def update_branch(branch_id: str, data: BranchUpdate, user: AdminOnly):
                 "fee_structure_name": m.fee_structure_name,
                 "start_time": m.start_time,
                 "end_time": m.end_time,
+                "cctv_stream_id": getattr(m, "cctv_stream_id", None),
             } for m in getattr(b, "class_fee_structures", []) or []
         ],
         "google_location": getattr(b, "google_location", None),
@@ -110,6 +131,16 @@ async def update_branch(branch_id: str, data: BranchUpdate, user: AdminOnly):
         "pincode": getattr(b, "pincode", None),
         "phone": b.phone,
         "coordinator_id": getattr(b, "coordinator_id", None),
+        "cctv_configs": [
+            {
+                "stream_id": c.stream_id,
+                "name": c.name,
+                "description": getattr(c, "description", "") or "",
+                "hls_playlist_url": c.hls_playlist_url,
+                "token_secret": c.token_secret,
+                "enabled": c.enabled,
+            } for c in b.cctv_configs
+        ],
     }
 
 

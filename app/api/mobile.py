@@ -120,18 +120,27 @@ async def dashboard(user: CurrentUser, student_id: str | None = None):
 
     branch_name = None
     class_timings = None
+    cctv_stream_url = None
+    cctv_stream_id = None
     branch_oid = _safe_oid(selected_student.branch_id)
     if branch_oid:
         branch = await Branch.get(branch_oid)
         if branch:
             branch_name = branch.name
-            # Find timings for the specific class
+            # Find timings and camera for the specific class
             for mapping in branch.class_fee_structures:
-                if mapping.class_name == selected_student.class_name:
+                if mapping.class_name == selected_student.class_name or mapping.class_name == selected_student.class_id:
                     class_timings = {
                         "start": mapping.start_time or "09:00",
                         "end": mapping.end_time or "13:00"
                     }
+                    if getattr(mapping, "cctv_stream_id", None):
+                        cctv_stream_id = mapping.cctv_stream_id
+                        # Find the cctv config
+                        config = next((c for c in branch.cctv_configs if c.stream_id == cctv_stream_id), None)
+                        if config and config.enabled:
+                            from app.services.cctv import generate_signed_stream_url
+                            cctv_stream_url = generate_signed_stream_url(config, student_id=str(selected_student.id))
                     break
 
     settings = await AppSettings.find_one()
@@ -208,6 +217,8 @@ async def dashboard(user: CurrentUser, student_id: str | None = None):
             "branch_id": selected_student.branch_id,
             "branch_name": branch_name,
             "class_timings": class_timings,
+            "cctv_stream_url": cctv_stream_url,
+            "cctv_stream_id": cctv_stream_id,
         },
         "cctv_enabled": cctv_enabled,
         "ads_enabled": ads_enabled,

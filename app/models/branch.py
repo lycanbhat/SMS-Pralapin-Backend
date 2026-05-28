@@ -11,12 +11,14 @@ class ClassFeeStructureMapping(BaseModel):
     fee_structure_name: str
     start_time: Optional[str] = "09:00"  # HH:MM format
     end_time: Optional[str] = "13:00"    # HH:MM format
+    cctv_stream_id: Optional[str] = None # CCTV Stream ID tagged to this class
 
 
 class CCTVConfig(BaseModel):
     """Per-location CCTV stream config (RTSP -> HLS)."""
     stream_id: str
     name: str
+    description: Optional[str] = ""  # Camera location or stream description
     hls_playlist_url: str  # After transcoding RTSP -> HLS
     token_secret: str  # For signed URL generation
     enabled: bool = True
