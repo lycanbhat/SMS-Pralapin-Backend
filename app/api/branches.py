@@ -111,3 +111,12 @@ async def update_branch(branch_id: str, data: BranchUpdate, user: AdminOnly):
         "phone": b.phone,
         "coordinator_id": getattr(b, "coordinator_id", None),
     }
+
+
+@router.delete("/{branch_id}", status_code=204)
+async def delete_branch(branch_id: str, user: AdminOnly):
+    b = await Branch.get(PydanticObjectId(branch_id))
+    if not b:
+        raise HTTPException(status_code=404, detail="Branch not found")
+    b.is_active = False
+    await b.save()
