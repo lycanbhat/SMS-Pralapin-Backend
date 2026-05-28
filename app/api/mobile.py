@@ -1,5 +1,4 @@
-"""Mobile parent app endpoints: dashboard and profile payloads."""
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone, time as dt_time
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, HTTPException, Query
@@ -136,10 +135,8 @@ async def dashboard(user: CurrentUser, student_id: str | None = None):
                     }
                     if getattr(mapping, "cctv_stream_id", None):
                         cctv_stream_id = mapping.cctv_stream_id
-                        # Find the cctv config
                         config = next((c for c in branch.cctv_configs if c.stream_id == cctv_stream_id), None)
                         if config and config.enabled:
-                            from datetime import datetime, timezone, timedelta, time as dt_time
                             utc_now = datetime.now(timezone.utc)
                             ist_now = utc_now + timedelta(hours=5, minutes=30)
                             current_local_time = ist_now.time()
