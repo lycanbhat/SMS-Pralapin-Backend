@@ -139,8 +139,21 @@ async def dashboard(user: CurrentUser, student_id: str | None = None):
                         # Find the cctv config
                         config = next((c for c in branch.cctv_configs if c.stream_id == cctv_stream_id), None)
                         if config and config.enabled:
-                            from app.services.cctv import generate_signed_stream_url
-                            cctv_stream_url = generate_signed_stream_url(config, student_id=str(selected_student.id))
+                            from datetime import datetime, timezone, timedelta, time as dt_time
+                            utc_now = datetime.now(timezone.utc)
+                            ist_now = utc_now + timedelta(hours=5, minutes=30)
+                            current_local_time = ist_now.time()
+                            
+                            sh, sm = (class_timings["start"] or "09:00").split(":")
+                            eh, em = (class_timings["end"] or "13:00").split(":")
+                            start_t = dt_time(int(sh), int(sm))
+                            end_t = dt_time(int(eh), int(em))
+                            
+                            if start_t <= current_local_time <= end_t:
+                                from app.services.cctv import generate_signed_stream_url
+                                cctv_stream_url = generate_signed_stream_url(config, student_id=str(selected_student.id))
+                            else:
+                                cctv_stream_url = None
                     break
 
     settings = await AppSettings.find_one()
